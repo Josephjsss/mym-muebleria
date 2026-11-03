@@ -202,7 +202,7 @@ export function whatsappHref(
 
 export const navLinks = [
   { label: "Inicio", href: "/" },
-  { label: "Nosotros", href: "/#nosotros" },
+  { label: "Nosotros", href: "/nosotros" },
   { label: "Productos", href: "/productos" },
   { label: "Contacto", href: "#contacto" },
 ] as const;
