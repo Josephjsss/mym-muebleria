@@ -46,24 +46,31 @@ export default async function AdminPage(props: PageProps<"/admin">) {
     typeof sp.campo === "string" && sp.campo in CAMPOS_BUSQUEDA
       ? (sp.campo as CampoBusqueda)
       : "nombre";
+  // Pestaña: productos activos (por defecto) o desactivados (eliminación lógica).
+  const vista: "activos" | "desactivados" = sp.vista === "desactivados" ? "desactivados" : "activos";
 
   const supabase = await createClient();
-  let consulta = supabase.from("productos").select(PRODUCTO_SELECT).order("codigo");
+  let consulta = supabase
+    .from("productos")
+    .select(PRODUCTO_SELECT)
+    .eq("activo", vista === "activos")
+    .order("codigo");
   const termino = limpiarTermino(q);
   if (termino) consulta = consulta.ilike(campo, `%${termino}%`);
 
   const [productosRes, categoriasRes, totalRes] = await Promise.all([
     consulta,
     supabase.from("categorias").select("*").order("id"),
-    supabase.from("productos").select("tipo"),
+    supabase.from("productos").select("tipo, activo"),
   ]);
 
   const todos = totalRes.data ?? [];
+  const activos = todos.filter((p) => p.activo);
   const resumen = {
-    total: todos.length,
-    productos: todos.filter((p) => p.tipo === "Producto").length,
-    servicios: todos.filter((p) => p.tipo === "Servicio").length,
-    categorias: categoriasRes.data?.length ?? 0,
+    total: activos.length,
+    productos: activos.filter((p) => p.tipo === "Producto").length,
+    servicios: activos.filter((p) => p.tipo === "Servicio").length,
+    desactivados: todos.length - activos.length,
   };
 
   return (
@@ -73,6 +80,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
       categorias={(categoriasRes.data ?? []) as Categoria[]}
       resumen={resumen}
       busquedaEstatica={{ q, campo }}
+      vista={vista}
       errorBD={productosRes.error?.message ?? null}
     />
   );

@@ -62,6 +62,7 @@ create table public.productos (
   imagen_url      text          not null,
   categoria_id    integer       not null references public.categorias (id),
   registrado_por  integer       references public.usuarios (id) on delete set null,
+  activo          boolean       not null default true,           -- false = desactivado (se puede reactivar)
   creado_en       timestamptz   not null default now(),
   actualizado_en  timestamptz   not null default now()
 );
@@ -119,7 +120,7 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- 3. Seguridad (Row Level Security)
---    - Cualquiera puede VER productos y categorías (catálogo público).
+--    - Cualquiera puede VER los productos ACTIVOS y las categorías (el admin ve todos).
 --    - Solo el ADMIN puede crear, editar o eliminar.
 --    - Cada usuario ve su propio perfil; el admin ve todos.
 -- ---------------------------------------------------------------------
@@ -128,7 +129,7 @@ alter table public.categorias enable row level security;
 alter table public.productos  enable row level security;
 
 create policy "catalogo publico: ver productos"
-  on public.productos for select using (true);
+  on public.productos for select using (activo or public.es_admin());
 create policy "admin: crear productos"
   on public.productos for insert with check (public.es_admin());
 create policy "admin: editar productos"

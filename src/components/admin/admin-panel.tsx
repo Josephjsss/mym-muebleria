@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { eliminarProducto } from "@/app/admin/actions";
+import { cambiarEstadoProducto, eliminarProducto } from "@/app/admin/actions";
 import { ProductoFormDialog } from "@/components/admin/producto-form";
 import { ProductImage } from "@/components/site/product-image";
 import { Button } from "@/components/ui/button";
@@ -39,8 +39,10 @@ import {
   Store,
   Package,
   Wrench,
-  Layers,
+  Archive,
   Boxes,
+  RotateCcw,
+  EyeOff,
   Loader2,
   CheckCircle2,
   AlertCircle,
@@ -51,8 +53,9 @@ type Props = {
   usuario: Usuario;
   productos: Producto[];
   categorias: Categoria[];
-  resumen: { total: number; productos: number; servicios: number; categorias: number };
+  resumen: { total: number; productos: number; servicios: number; desactivados: number };
   busquedaEstatica: { q: string; campo: CampoBusqueda };
+  vista: "activos" | "desactivados";
   errorBD: string | null;
 };
 
@@ -62,8 +65,10 @@ export function AdminPanel({
   categorias,
   resumen,
   busquedaEstatica,
+  vista,
   errorBD,
 }: Props) {
+  const enDesactivados = vista === "desactivados";
   const router = useRouter();
   const [aviso, setAviso] = useState<{ ok: boolean; mensaje: string } | null>(null);
 
@@ -72,9 +77,10 @@ export function AdminPanel({
   const [enEdicion, setEnEdicion] = useState<Producto | null>(null);
   const [claveForm, setClaveForm] = useState(0);
 
-  // Confirmación de eliminar
+  // Confirmación: desactivar (eliminación lógica) o eliminar definitivamente
   const [porEliminar, setPorEliminar] = useState<Producto | null>(null);
   const [eliminando, iniciarEliminar] = useTransition();
+  const [reactivando, iniciarReactivar] = useTransition();
 
   // BÚSQUEDA DINÁMICA: consulta la BD mientras se escribe.
   const [textoDinamico, setTextoDinamico] = useState("");
@@ -90,6 +96,7 @@ export function AdminPanel({
       const { data } = await createClient()
         .from("productos")
         .select(PRODUCTO_SELECT)
+        .eq("activo", !enDesactivados)
         .or(
           `nombre.ilike.%${termino}%,codigo.ilike.%${termino}%,marca.ilike.%${termino}%,descripcion.ilike.%${termino}%`
         )
@@ -102,7 +109,7 @@ export function AdminPanel({
       cancelado = true;
       clearTimeout(t);
     };
-  }, [textoDinamico, productos]);
+  }, [textoDinamico, productos, enDesactivados]);
 
   // Si hay texto en la búsqueda dinámica se muestran sus resultados;
   // si no, la lista que mandó el servidor (completa o con búsqueda estática).
@@ -128,13 +135,21 @@ export function AdminPanel({
     [router]
   );
 
+  // En "Activos" el botón eliminar DESACTIVA; en "Desactivados" borra de verdad.
   function confirmarEliminar() {
     if (!porEliminar) return;
     const id = porEliminar.id;
     iniciarEliminar(async () => {
-      const r = await eliminarProducto(id);
+      const r = enDesactivados ? await eliminarProducto(id) : await cambiarEstadoProducto(id, false);
       setAviso(r);
       setPorEliminar(null);
+      router.refresh();
+    });
+  }
+
+  function reactivar(p: Producto) {
+    iniciarReactivar(async () => {
+      setAviso(await cambiarEstadoProducto(p.id, true));
       router.refresh();
     });
   }
@@ -179,10 +194,10 @@ export function AdminPanel({
       <main className="mx-auto max-w-7xl px-4 py-6">
         {/* Resumen */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Indicador icono={Boxes} etiqueta="Registros en la BD" valor={resumen.total} />
+          <Indicador icono={Boxes} etiqueta="Activos en la web" valor={resumen.total} />
           <Indicador icono={Package} etiqueta="Productos" valor={resumen.productos} />
           <Indicador icono={Wrench} etiqueta="Servicios" valor={resumen.servicios} />
-          <Indicador icono={Layers} etiqueta="Categorías" valor={resumen.categorias} />
+          <Indicador icono={Archive} etiqueta="Desactivados" valor={resumen.desactivados} />
         </div>
 
         {/* Búsquedas */}
@@ -200,6 +215,7 @@ export function AdminPanel({
               y el servidor devuelve la página filtrada.
             </p>
             <form method="get" action="/admin" className="mt-3 flex flex-col gap-2 sm:flex-row">
+              {enDesactivados && <input type="hidden" name="vista" value="desactivados" />}
               <select
                 name="campo"
                 defaultValue={busquedaEstatica.campo}
@@ -225,7 +241,7 @@ export function AdminPanel({
                   Buscar
                 </Button>
                 {filtroEstaticoActivo && (
-                  <Button variant="outline" className="h-9" nativeButton={false} render={<Link href="/admin" />}>
+                  <Button variant="outline" className="h-9" nativeButton={false} render={<Link href={enDesactivados ? "/admin?vista=desactivados" : "/admin"} />}>
                     Limpiar
                   </Button>
                 )}
@@ -295,26 +311,42 @@ export function AdminPanel({
         <section className="mt-5 overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
             <div>
-              <h2 className="font-heading text-base font-semibold">Productos y servicios</h2>
+              <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
+                <Pestana href="/admin" activa={!enDesactivados} icono={Boxes}>
+                  Activos ({resumen.total})
+                </Pestana>
+                <Pestana href="/admin?vista=desactivados" activa={enDesactivados} icono={Archive}>
+                  Desactivados ({resumen.desactivados})
+                </Pestana>
+              </div>
+              <h2 className="mt-3 font-heading text-base font-semibold">
+                {enDesactivados ? "Productos desactivados" : "Productos y servicios"}
+              </h2>
               <p className="text-xs text-muted-foreground">
                 {dinamicaActiva
                   ? `${lista.length} resultado(s) de la búsqueda dinámica «${textoDinamico}»`
                   : filtroEstaticoActivo
                     ? `${lista.length} resultado(s) de la búsqueda estática: ${CAMPOS_BUSQUEDA[busquedaEstatica.campo]} contiene «${busquedaEstatica.q}»`
-                    : `${lista.length} registros`}
+                    : enDesactivados
+                      ? `${lista.length} registro(s) ocultos de la web; puedes reactivarlos`
+                      : `${lista.length} registros`}
               </p>
             </div>
-            <Button onClick={abrirNuevo}>
-              <Plus className="size-4" />
-              Nuevo producto
-            </Button>
+            {!enDesactivados && (
+              <Button onClick={abrirNuevo}>
+                <Plus className="size-4" />
+                Nuevo producto
+              </Button>
+            )}
           </div>
 
           {errorBD ? (
             <p className="p-6 text-sm text-destructive">Error de base de datos: {errorBD}</p>
           ) : lista.length === 0 ? (
             <p className="p-10 text-center text-sm text-muted-foreground">
-              No hay productos que coincidan con la búsqueda.
+              {enDesactivados && !filtroEstaticoActivo && !dinamicaActiva
+                ? "No hay productos desactivados. Cuando elimines uno aparecerá aquí."
+                : "No hay productos que coincidan con la búsqueda."}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -336,7 +368,7 @@ export function AdminPanel({
                   {lista.map((p) => (
                     <tr key={p.id} className="transition-colors hover:bg-muted/40">
                       <td className="px-4 py-2">
-                        <div className="relative size-14 overflow-hidden rounded-lg border bg-muted">
+                        <div className={cn("relative size-14 overflow-hidden rounded-lg border bg-muted", enDesactivados && "opacity-60 grayscale")}>
                           <ProductImage src={p.imagen_url} alt={p.nombre} sizes="56px" />
                         </div>
                       </td>
@@ -355,6 +387,32 @@ export function AdminPanel({
                         {formatoPrecio(p.precio)}
                       </td>
                       <td className="px-4 py-2">
+                        {enDesactivados ? (
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              title="Reactivar"
+                              aria-label={`Reactivar ${p.nombre}`}
+                              disabled={reactivando}
+                              className="border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
+                              onClick={() => reactivar(p)}
+                            >
+                              <RotateCcw className="size-4" />
+                              Reactivar
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              title="Eliminar definitivamente"
+                              aria-label={`Eliminar definitivamente ${p.nombre}`}
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => setPorEliminar(p)}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ) : (
                         <div className="flex justify-end gap-1">
                           <Button
                             size="icon-sm"
@@ -378,7 +436,7 @@ export function AdminPanel({
                           <Button
                             size="icon-sm"
                             variant="ghost"
-                            title="Eliminar"
+                            title="Eliminar (desactivar)"
                             aria-label={`Eliminar ${p.nombre}`}
                             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => setPorEliminar(p)}
@@ -386,6 +444,7 @@ export function AdminPanel({
                             <Trash2 className="size-4" />
                           </Button>
                         </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -408,10 +467,21 @@ export function AdminPanel({
       <Dialog open={Boolean(porEliminar)} onOpenChange={(v) => !v && setPorEliminar(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>¿Eliminar este registro?</DialogTitle>
+            <DialogTitle>
+              {enDesactivados ? "¿Eliminar definitivamente?" : "¿Eliminar este registro?"}
+            </DialogTitle>
             <DialogDescription>
-              Se borrará «{porEliminar?.nombre}» ({porEliminar?.codigo}) de la base de datos.
-              Esta acción no se puede deshacer.
+              {enDesactivados ? (
+                <>
+                  Se borrará «{porEliminar?.nombre}» ({porEliminar?.codigo}) de la base de datos
+                  junto con su imagen. Esta acción no se puede deshacer.
+                </>
+              ) : (
+                <>
+                  «{porEliminar?.nombre}» ({porEliminar?.codigo}) dejará de mostrarse en la web y
+                  pasará a la pestaña <b>Desactivados</b>, desde donde podrás reactivarlo.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
@@ -423,13 +493,45 @@ export function AdminPanel({
               disabled={eliminando}
               onClick={confirmarEliminar}
             >
-              {eliminando ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              Eliminar
+              {eliminando ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : enDesactivados ? (
+                <Trash2 className="size-4" />
+              ) : (
+                <EyeOff className="size-4" />
+              )}
+              {enDesactivados ? "Eliminar definitivamente" : "Eliminar"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function Pestana({
+  href,
+  activa,
+  icono: Icono,
+  children,
+}: {
+  href: string;
+  activa: boolean;
+  icono: typeof Package;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={activa ? "page" : undefined}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+        activa ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      <Icono className="size-3.5" />
+      {children}
+    </Link>
   );
 }
 

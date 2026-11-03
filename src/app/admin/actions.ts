@@ -95,7 +95,36 @@ export async function guardarProducto(
   }
 }
 
-/** ELIMINAR un producto (y su imagen si estaba en Supabase Storage). */
+/**
+ * DESACTIVAR (eliminación lógica) o REACTIVAR un producto.
+ * El registro sigue en la BD; solo cambia la columna `activo`.
+ */
+export async function cambiarEstadoProducto(id: number, activo: boolean): Promise<ResultadoAccion> {
+  try {
+    await exigirAdmin();
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("productos")
+      .update({ activo })
+      .eq("id", id)
+      .select("nombre")
+      .maybeSingle();
+    if (error) return { ok: false, mensaje: traducirError(error.message) };
+    if (!data) return { ok: false, mensaje: "El producto ya no existe." };
+
+    revalidarCatalogo();
+    return {
+      ok: true,
+      mensaje: activo
+        ? `«${data.nombre}» se reactivó y vuelve a mostrarse en la web.`
+        : `«${data.nombre}» se desactivó. Puedes reactivarlo en la pestaña Desactivados.`,
+    };
+  } catch (e) {
+    return { ok: false, mensaje: e instanceof Error ? e.message : "Error inesperado." };
+  }
+}
+
+/** ELIMINAR DEFINITIVAMENTE un producto desactivado (y su imagen si estaba en Supabase Storage). */
 export async function eliminarProducto(id: number): Promise<ResultadoAccion> {
   try {
     await exigirAdmin();
@@ -103,10 +132,13 @@ export async function eliminarProducto(id: number): Promise<ResultadoAccion> {
 
     const { data: producto } = await supabase
       .from("productos")
-      .select("nombre, imagen_url")
+      .select("nombre, imagen_url, activo")
       .eq("id", id)
       .maybeSingle();
     if (!producto) return { ok: false, mensaje: "El producto ya no existe." };
+    if (producto.activo) {
+      return { ok: false, mensaje: "Primero desactiva el producto; solo se borran definitivamente los desactivados." };
+    }
 
     const { error } = await supabase.from("productos").delete().eq("id", id);
     if (error) return { ok: false, mensaje: traducirError(error.message) };
@@ -119,7 +151,7 @@ export async function eliminarProducto(id: number): Promise<ResultadoAccion> {
     }
 
     revalidarCatalogo();
-    return { ok: true, mensaje: `«${producto.nombre}» se eliminó.` };
+    return { ok: true, mensaje: `«${producto.nombre}» se eliminó definitivamente.` };
   } catch (e) {
     return { ok: false, mensaje: e instanceof Error ? e.message : "Error inesperado." };
   }

@@ -19,6 +19,8 @@ export type Producto = {
   imagen_url: string;
   categoria_id: number;
   registrado_por: number | null;
+  // false = desactivado: no se muestra en la web y se puede reactivar desde el panel.
+  activo: boolean;
   creado_en: string;
   actualizado_en: string;
   // Relación con categorias (JOIN que hace Supabase).

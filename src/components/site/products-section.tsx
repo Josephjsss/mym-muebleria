@@ -12,8 +12,8 @@ const DESTACADOS = ["PRD-002", "PRD-004", "PRD-010", "PRD-013", "PRD-016", "SRV-
 export async function ProductsSection() {
   const supabase = await createClient();
   const [{ data }, { count }] = await Promise.all([
-    supabase.from("productos").select(PRODUCTO_SELECT).in("codigo", DESTACADOS).order("codigo"),
-    supabase.from("productos").select("id", { count: "exact", head: true }),
+    supabase.from("productos").select(PRODUCTO_SELECT).eq("activo", true).in("codigo", DESTACADOS).order("codigo"),
+    supabase.from("productos").select("id", { count: "exact", head: true }).eq("activo", true),
   ]);
   const productos = (data ?? []) as Producto[];
 

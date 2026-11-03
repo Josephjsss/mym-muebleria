@@ -21,6 +21,7 @@ export default async function ProductoDetallePage(props: PageProps<"/productos/[
     .from("productos")
     .select(PRODUCTO_SELECT)
     .eq("id", idNumero)
+    .eq("activo", true)
     .maybeSingle();
   if (!data) notFound();
   const producto = data as Producto;
@@ -30,6 +31,7 @@ export default async function ProductoDetallePage(props: PageProps<"/productos/[
     .select(PRODUCTO_SELECT)
     .eq("categoria_id", producto.categoria_id)
     .neq("id", producto.id)
+    .eq("activo", true)
     .order("codigo")
     .limit(4);
 
