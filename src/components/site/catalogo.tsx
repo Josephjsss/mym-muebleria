@@ -45,7 +45,7 @@ export function Catalogo({
     const temporizador = setTimeout(async () => {
       setCargando(true);
       const supabase = createClient();
-      let consulta = supabase.from("productos").select(PRODUCTO_SELECT).order("codigo");
+      let consulta = supabase.from("productos").select(PRODUCTO_SELECT).eq("activo", true).order("codigo");
 
       const termino = limpiarTermino(texto);
       if (termino) {

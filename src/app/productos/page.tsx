@@ -22,7 +22,8 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
   const categoriaInicial =
     categorias.find((c) => c.nombre.toLowerCase() === String(categoria ?? "").toLowerCase()) ?? null;
 
-  let consulta = supabase.from("productos").select(PRODUCTO_SELECT).order("codigo");
+  // Solo productos activos (los desactivados se gestionan en el panel).
+  let consulta = supabase.from("productos").select(PRODUCTO_SELECT).eq("activo", true).order("codigo");
   if (categoriaInicial) consulta = consulta.eq("categoria_id", categoriaInicial.id);
   const productosRes = await consulta;
 
