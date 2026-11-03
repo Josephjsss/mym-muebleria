@@ -1,0 +1,2 @@
+Fotos presentables del equipo y de la empresa (cuadradas, ~600x600).
+Después de agregarlas, escribir su ruta en "foto" dentro de src/data/equipo.ts y src/data/desarrolladores.ts.
