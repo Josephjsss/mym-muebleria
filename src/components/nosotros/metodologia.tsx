@@ -1,5 +1,5 @@
 import { Reveal } from "@/components/reactbits/Reveal";
-import { fasesScrum, sprints } from "@/data/equipo";
+import { fasesScrum, sprints } from "@/data/metodologia";
 import { RefreshCcw } from "lucide-react";
 
 /** Metodología de programación: Scrum con todas sus fases y los 4 sprints. */
