@@ -18,23 +18,27 @@ export type Desarrollador = {
 
 export const desarrolladores: Desarrollador[] = [
   {
-    nombre: "Joseph Salinas",
+    nombre: "Joseph Salinas Pérez",
     rol: "Backend y base de datos",
     rama: "joseph",
-    resumen: "Estudiante de Ingeniería de Sistemas e Informática en la UTP.",
-    programas: ["Visual Studio Code", "Git y GitHub", "Supabase"],
-    lenguajes: ["TypeScript", "JavaScript", "SQL"],
-    habilidades: ["Liderazgo", "Trabajo en equipo", "Comunicación", "Responsabilidad", "Resolución de problemas"],
+    resumen:
+      "Estudiante de 6.º ciclo de Ingeniería de Sistemas en la UTP. Interesado en desarrollo de software, análisis de datos, bases de datos y seguridad de la información.",
+    foto: "/images/equipo/joseph-salinas.jpg",
+    programas: ["Microsoft Excel", "Microsoft Office", "Visual Studio Code"],
+    lenguajes: ["Java", "JavaScript", "HTML y CSS"],
+    habilidades: ["Trabajo en equipo", "Comunicación efectiva", "Liderazgo", "Responsabilidad", "Adaptabilidad"],
     cvPdf: "/cv/joseph-salinas.pdf",
   },
   {
-    nombre: "Juan Pablo",
+    nombre: "Juan Pablo Castillo Sullón",
     rol: "Coordinador · Frontend y diseño",
     rama: "juan-pablo",
-    resumen: "Estudiante de Ingeniería de Sistemas e Informática en la UTP.",
-    programas: ["Visual Studio Code", "Git y GitHub", "Figma"],
-    lenguajes: ["TypeScript", "HTML y CSS", "JavaScript"],
-    habilidades: ["Creatividad", "Trabajo en equipo", "Comunicación", "Adaptabilidad", "Puntualidad"],
+    resumen:
+      "Estudiante de Ingeniería de Sistemas con experiencia en automatización industrial. Desarrolla aplicaciones en Excel VBA, JavaScript, HTML y CSS.",
+    foto: "/images/equipo/juan-pablo.jpg",
+    programas: ["Visual Studio Code", "Microsoft Excel", "Git y GitHub"],
+    lenguajes: ["JavaScript", "HTML y CSS", "VBA"],
+    habilidades: ["Resolución de problemas", "Pensamiento analítico", "Trabajo en equipo", "Liderazgo", "Comunicación"],
     cvPdf: "/cv/juan-pablo.pdf",
   },
 ];

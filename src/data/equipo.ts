@@ -21,7 +21,8 @@ export const docente: Persona = {
 };
 
 export const coordinador: Persona = {
-  nombre: "Juan Pablo",
+  nombre: "Juan Pablo Castillo",
+  foto: "/images/equipo/juan-pablo.jpg",
   cargo: "Coordinador del proyecto",
   descripcion: "Asigna las áreas de trabajo, revisa los Pull Requests y une las ramas en main.",
 };
@@ -30,11 +31,13 @@ export const cargos: Persona[] = [
   {
     nombre: "Joseph Salinas",
     cargo: "Backend y base de datos",
+    foto: "/images/equipo/joseph-salinas.jpg",
     descripcion: "Supabase (PostgreSQL), login con roles y panel de administración (CRUD).",
   },
   {
-    nombre: "Juan Pablo",
+    nombre: "Juan Pablo Castillo",
     cargo: "Frontend y diseño",
+    foto: "/images/equipo/juan-pablo.jpg",
     descripcion: "Páginas públicas, slider, catálogo y diseño adaptable a celulares.",
   },
   {
