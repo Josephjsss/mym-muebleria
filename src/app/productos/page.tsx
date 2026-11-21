@@ -17,17 +17,11 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
   const { categoria } = await props.searchParams;
   const supabase = await createClient();
 
-  const categoriasRes = await supabase.from("categorias").select("*").order("id");
-  const categorias = (categoriasRes.data ?? []) as Categoria[];
-  // ?categoria=Roperos (desde los íconos del inicio) filtra desde la primera carga.
-  const categoriaInicial =
-    categorias.find((c) => c.nombre.toLowerCase() === String(categoria ?? "").toLowerCase()) ?? null;
-
-  // Solo productos activos (los desactivados se gestionan en el panel).
-  let consulta = supabase.from("productos").select(PRODUCTO_SELECT).eq("activo", true).order("codigo");
-  if (categoriaInicial) consulta = consulta.eq("categoria_id", categoriaInicial.id);
-  const [productosRes, ofertasRes] = await Promise.all([
-    consulta,
+  // Las 3 consultas van EN PARALELO (una sola espera a la BD en vez de dos).
+  const [categoriasRes, productosRes, ofertasRes] = await Promise.all([
+    supabase.from("categorias").select("*").order("id"),
+    // Solo productos activos (los desactivados se gestionan en el panel).
+    supabase.from("productos").select(PRODUCTO_SELECT).eq("activo", true).order("codigo"),
     // OFERTAS: productos activos con descuento (mínimo 5 %, lo exige la BD).
     supabase
       .from("productos")
@@ -37,6 +31,13 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
       .order("descuento", { ascending: false })
       .limit(8),
   ]);
+  const categorias = (categoriasRes.data ?? []) as Categoria[];
+  // ?categoria=Roperos (desde los íconos del inicio) filtra desde la primera carga.
+  const categoriaInicial =
+    categorias.find((c) => c.nombre.toLowerCase() === String(categoria ?? "").toLowerCase()) ?? null;
+  const productos = ((productosRes.data ?? []) as Producto[]).filter(
+    (p) => !categoriaInicial || p.categoria_id === categoriaInicial.id
+  );
   const ofertas = (ofertasRes.data ?? []) as Producto[];
 
   const error = productosRes.error || categoriasRes.error;
@@ -91,7 +92,7 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
                 <p className="font-medium">No se pudo conectar con la base de datos.</p>
                 <p className="mt-1 text-muted-foreground">
                   Revisa el archivo <code>.env.local</code> y que el script{" "}
-                  <code>supabase/mym_avance2.sql</code> se haya ejecutado. Detalle: {error.message}
+                  <code>supabase/mym_muebleria.sql</code> se haya ejecutado. Detalle: {error.message}
                 </p>
               </div>
             </div>
@@ -99,7 +100,7 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
             <Catalogo
               // key: al cambiar ?categoria= (botones del slider) el catálogo se reinicia con ese filtro.
               key={categoriaInicial?.id ?? "todas"}
-              productosIniciales={(productosRes.data ?? []) as Producto[]}
+              productosIniciales={productos}
               categorias={categorias}
               categoriaInicial={categoriaInicial?.id ?? null}
             />
