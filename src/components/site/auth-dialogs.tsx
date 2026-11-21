@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Mail, Lock, User, LogIn, UserPlus, ArrowRight, X, LayoutDashboard, LogOut, Loader2 } from "lucide-react";
+import { Mail, Lock, User, LogIn, UserPlus, ArrowRight, X, LayoutDashboard, LogOut, Loader2, Receipt } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -190,6 +190,12 @@ export function AuthDialogs() {
         <span className="hidden max-w-32 truncate text-sm text-muted-foreground lg:inline">
           Hola, {sesion.nombre.split(" ")[0]}
         </span>
+        {sesion.rol === "cliente" && (
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href="/pedidos" />}>
+            <Receipt className="size-3.5" />
+            Mis pedidos
+          </Button>
+        )}
         {sesion.rol === "admin" && (
           <Button size="sm" nativeButton={false} render={<Link href="/admin" />}>
             <LayoutDashboard className="size-3.5" />

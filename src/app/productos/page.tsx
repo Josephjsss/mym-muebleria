@@ -5,7 +5,8 @@ import { Catalogo } from "@/components/site/catalogo";
 import { ProductsSlider } from "@/components/site/products-slider";
 import { createClient } from "@/lib/supabase/server";
 import { PRODUCTO_SELECT, type Categoria, type Producto } from "@/lib/types";
-import { DatabaseZap } from "lucide-react";
+import { ProductCard } from "@/components/site/product-card";
+import { BadgePercent, DatabaseZap } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Productos y servicios · M&M Mueblería",
@@ -25,7 +26,18 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
   // Solo productos activos (los desactivados se gestionan en el panel).
   let consulta = supabase.from("productos").select(PRODUCTO_SELECT).eq("activo", true).order("codigo");
   if (categoriaInicial) consulta = consulta.eq("categoria_id", categoriaInicial.id);
-  const productosRes = await consulta;
+  const [productosRes, ofertasRes] = await Promise.all([
+    consulta,
+    // OFERTAS: productos activos con descuento (mínimo 5 %, lo exige la BD).
+    supabase
+      .from("productos")
+      .select(PRODUCTO_SELECT)
+      .eq("activo", true)
+      .gt("descuento", 0)
+      .order("descuento", { ascending: false })
+      .limit(8),
+  ]);
+  const ofertas = (ofertasRes.data ?? []) as Producto[];
 
   const error = productosRes.error || categoriasRes.error;
 
@@ -52,6 +64,24 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
             </div>
           </div>
         </section>
+
+        {!error && ofertas.length > 0 && (
+          <section id="ofertas" className="mx-auto max-w-6xl scroll-mt-20 px-4 pt-10">
+            <div className="flex items-center gap-2 text-primary">
+              <BadgePercent className="size-5" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Ofertas</span>
+            </div>
+            <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight">Precios rebajados</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Descuentos desde el 5 % en muebles seleccionados, hasta agotar stock.
+            </p>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {ofertas.map((p) => (
+                <ProductCard key={p.id} producto={p} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="mx-auto max-w-6xl px-4 pb-16">
           {error ? (

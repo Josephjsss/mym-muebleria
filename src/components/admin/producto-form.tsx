@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { Categoria, Producto } from "@/lib/types";
+import { DESCUENTO_MAXIMO, DESCUENTO_MINIMO, formatoPrecio, precioFinal, type Categoria, type Producto } from "@/lib/types";
 import { ImagePlus, Loader2, Save, UploadCloud } from "lucide-react";
 
 const claseCampo =
@@ -46,6 +46,8 @@ export function ProductoFormDialog({
   const [imagenUrl, setImagenUrl] = useState(producto?.imagen_url ?? "");
   const [tipo, setTipo] = useState<Producto["tipo"]>(producto?.tipo ?? "Producto");
   const [subiendo, setSubiendo] = useState(false);
+  const [precio, setPrecio] = useState(String(producto?.precio ?? ""));
+  const [descuento, setDescuento] = useState(String(producto?.descuento || ""));
   const [errorImagen, setErrorImagen] = useState<string | null>(null);
   const ultimoEstado = useRef<ResultadoAccion>(null);
 
@@ -217,8 +219,50 @@ export function ProductoFormDialog({
             </Campo>
 
             <Campo etiqueta="Precio (S/) *">
-              <Input name="precio" type="number" required min={0} step="0.01" defaultValue={producto?.precio} placeholder="0.00" />
+              <Input
+                name="precio"
+                type="number"
+                required
+                min={0}
+                step="0.01"
+                value={precio}
+                onChange={(e) => setPrecio(e.target.value)}
+                placeholder="0.00"
+              />
             </Campo>
+
+            <Campo etiqueta={`Oferta (% de descuento, mín. ${DESCUENTO_MINIMO})`}>
+              <Input
+                name="descuento"
+                type="number"
+                min={0}
+                max={DESCUENTO_MAXIMO}
+                step={1}
+                value={descuento}
+                onChange={(e) => setDescuento(e.target.value)}
+                placeholder="Vacío = sin oferta"
+              />
+              {Number(descuento) > 0 && Number(precio) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {Number(descuento) < DESCUENTO_MINIMO ? (
+                    <span className="text-destructive">La oferta mínima es {DESCUENTO_MINIMO} %.</span>
+                  ) : (
+                    <>
+                      Precio de oferta:{" "}
+                      <b className="text-primary">
+                        {formatoPrecio(precioFinal({ precio: Number(precio), descuento: Number(descuento) }))}
+                      </b>
+                    </>
+                  )}
+                </p>
+              )}
+            </Campo>
+
+            {tipo === "Producto" && (
+              <Campo etiqueta="Stock (unidades) *">
+                <Input name="stock" type="number" required min={0} step={1} defaultValue={producto?.stock ?? 10} />
+              </Campo>
+            )}
 
             <Campo etiqueta={tipo === "Servicio" ? "Duración" : "Duración / entrega (opcional)"}>
               <Input

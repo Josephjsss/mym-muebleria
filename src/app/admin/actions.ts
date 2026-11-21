@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { obtenerUsuarioActual } from "@/lib/auth";
+import { DESCUENTO_MAXIMO, DESCUENTO_MINIMO } from "@/lib/types";
 
 export type ResultadoAccion = { ok: boolean; mensaje: string } | null;
 
@@ -57,6 +58,9 @@ export async function guardarProducto(
       precio: Number(formData.get("precio")),
       imagen_url: String(formData.get("imagen_url") ?? "").trim(),
       categoria_id: Number(formData.get("categoria_id")),
+      // Vacío = sin oferta (0). Los servicios no llevan stock.
+      descuento: Number(formData.get("descuento") || 0),
+      stock: tipo === "Servicio" ? 0 : Number(formData.get("stock") || 0),
     };
 
     // Validaciones (la BD también tiene NOT NULL y CHECK).
@@ -67,6 +71,16 @@ export async function guardarProducto(
       return { ok: false, mensaje: "El precio debe ser un número mayor o igual a 0." };
     if (!datos.categoria_id) return { ok: false, mensaje: "Elige una categoría." };
     if (!datos.imagen_url) return { ok: false, mensaje: "Sube una imagen del producto." };
+    if (
+      !Number.isInteger(datos.descuento) ||
+      (datos.descuento !== 0 && (datos.descuento < DESCUENTO_MINIMO || datos.descuento > DESCUENTO_MAXIMO))
+    )
+      return {
+        ok: false,
+        mensaje: `La oferta debe ser 0 (sin oferta) o un entero entre ${DESCUENTO_MINIMO} % y ${DESCUENTO_MAXIMO} %.`,
+      };
+    if (!Number.isInteger(datos.stock) || datos.stock < 0)
+      return { ok: false, mensaje: "El stock debe ser un número entero mayor o igual a 0." };
 
     const supabase = await createClient();
     let codigo = String(formData.get("codigo") ?? "").trim().toUpperCase();
@@ -159,6 +173,9 @@ export async function eliminarProducto(id: number): Promise<ResultadoAccion> {
 
 function traducirError(mensaje: string) {
   if (/duplicate key.*codigo/i.test(mensaje)) return "Ya existe un producto con ese código.";
+  if (/productos_descuento_chk/i.test(mensaje)) return `La oferta debe ser de ${DESCUENTO_MINIMO} % como mínimo.`;
+  if (/column .*(descuento|stock).* does not exist|could not find the '(descuento|stock)' column/i.test(mensaje))
+    return "Falta preparar la base de datos: ejecuta supabase/final_ofertas_compras.sql en Supabase.";
   if (/row-level security/i.test(mensaje)) return "La base de datos rechazó la operación: tu usuario no es administrador.";
   return mensaje;
 }

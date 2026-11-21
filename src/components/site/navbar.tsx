@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { navLinks, company } from "@/data/company";
 import { AuthDialogs } from "@/components/site/auth-dialogs";
 import PillNav from "@/components/reactbits/PillNav";
+import { CarritoBoton } from "@/components/site/carrito-boton";
 
 export function Navbar({ active = "/" }: { active?: string }) {
   const [open, setOpen] = useState(false);
@@ -36,10 +37,13 @@ export function Navbar({ active = "/" }: { active?: string }) {
           />
         </div>
 
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-2 md:flex">
+          <CarritoBoton />
           <AuthDialogs />
         </div>
 
+        <div className="flex items-center gap-1 md:hidden">
+          <CarritoBoton />
         <Button
           variant="ghost"
           size="icon"
@@ -49,6 +53,7 @@ export function Navbar({ active = "/" }: { active?: string }) {
         >
           {open ? <X className="size-5" /> : <Menu className="size-5" />}
         </Button>
+        </div>
       </div>
 
       {open && (
