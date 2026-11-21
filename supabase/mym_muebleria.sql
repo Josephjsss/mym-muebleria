@@ -16,10 +16,12 @@
 --    usuarios   (1) ──registra──< (N) productos
 --    categorias (1) ──agrupa────< (N) productos
 --    usuarios   (1) ──compra────< (N) pedidos (1) ──< (N) pedido_items
+--    mensajes_contacto · opiniones  (formularios de la página Contacto)
 --
 --  Incluye: catálogo con eliminación lógica (activo), ofertas (descuento
 --  mínimo 5 %), stock, carrito → pedidos con boleta, compra segura
---  (registrar_compra) y seguridad por filas (RLS).
+--  (registrar_compra), página Contacto (mensajes y opiniones) y
+--  seguridad por filas (RLS).
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -31,6 +33,8 @@ drop function if exists public.es_admin() cascade;
 drop function if exists public.registrar_compra(jsonb, text, text, text, text, uuid) cascade;
 drop function if exists public.registrar_compra(jsonb, text, text, text, text) cascade;
 drop function if exists public.mi_usuario_id() cascade;
+drop table if exists public.mensajes_contacto cascade;
+drop table if exists public.opiniones         cascade;
 drop table if exists public.pedido_items cascade;
 drop table if exists public.pedidos      cascade;
 drop table if exists public.productos  cascade;
@@ -148,6 +152,34 @@ create table public.pedido_items (
 create index pedidos_usuario_idx  on public.pedidos (usuario_id);
 create index pedidos_fecha_idx    on public.pedidos (creado_en);
 create index pedido_items_ped_idx on public.pedido_items (pedido_id);
+
+-- ---------------------------------------------------------------------
+-- 1.5 CONTACTO: mensajes del formulario y opiniones de clientes
+-- ---------------------------------------------------------------------
+create table public.mensajes_contacto (
+  id         integer generated always as identity primary key,
+  nombre     varchar(100) not null check (length(trim(nombre)) >= 2),
+  correo     varchar(150) not null check (correo ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  telefono   varchar(20),
+  asunto     varchar(30)  not null default 'Consulta'
+             check (asunto in ('Cotización', 'Consulta', 'Pedido', 'Reclamo', 'Otro')),
+  mensaje    text         not null check (length(trim(mensaje)) between 10 and 2000),
+  leido      boolean      not null default false,
+  creado_en  timestamptz  not null default now()
+);
+
+create table public.opiniones (
+  id           integer generated always as identity primary key,
+  nombre       varchar(80)  not null check (length(trim(nombre)) >= 2),
+  ciudad       varchar(80),
+  calificacion smallint     not null check (calificacion between 1 and 5),
+  comentario   text         not null check (length(trim(comentario)) between 10 and 600),
+  visible      boolean      not null default true,   -- el admin puede ocultarla
+  creado_en    timestamptz  not null default now()
+);
+
+create index mensajes_contacto_fecha_idx on public.mensajes_contacto (creado_en desc);
+create index opiniones_fecha_idx         on public.opiniones (creado_en desc);
 
 -- ---------------------------------------------------------------------
 -- 2. Registro automático: cada cuenta nueva de Supabase Auth
@@ -320,6 +352,8 @@ end $$;
 --    - Cada usuario ve su propio perfil; el admin ve todos.
 --    - Cada cliente ve solo SUS pedidos; el admin ve todos y cambia su estado.
 --    - Nadie inserta pedidos directamente: solo con registrar_compra().
+--    - Cualquiera ENVÍA mensajes de contacto u opiniones; solo el admin lee
+--      los mensajes (datos personales). Todos ven las opiniones visibles.
 -- ---------------------------------------------------------------------
 alter table public.usuarios   enable row level security;
 alter table public.categorias enable row level security;
@@ -366,6 +400,31 @@ grant update on public.pedidos to authenticated;
 
 revoke all on function public.registrar_compra(jsonb, text, text, text, text, uuid) from public, anon;
 grant execute on function public.registrar_compra(jsonb, text, text, text, text, uuid) to authenticated;
+
+-- Contacto
+alter table public.mensajes_contacto enable row level security;
+alter table public.opiniones         enable row level security;
+
+create policy "contacto: enviar"
+  on public.mensajes_contacto for insert with check (not leido);
+create policy "contacto: admin lee"
+  on public.mensajes_contacto for select using (public.es_admin());
+create policy "contacto: admin gestiona"
+  on public.mensajes_contacto for update using (public.es_admin()) with check (public.es_admin());
+
+create policy "opiniones: enviar"
+  on public.opiniones for insert with check (visible);
+create policy "opiniones: ver"
+  on public.opiniones for select using (visible or public.es_admin());
+create policy "opiniones: admin gestiona"
+  on public.opiniones for update using (public.es_admin()) with check (public.es_admin());
+create policy "opiniones: admin elimina"
+  on public.opiniones for delete using (public.es_admin());
+
+grant insert on public.mensajes_contacto, public.opiniones to anon, authenticated;
+grant select on public.opiniones to anon, authenticated;
+grant select, update on public.mensajes_contacto to authenticated;
+grant update, delete on public.opiniones to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 5. Almacenamiento de imágenes (Supabase Storage)

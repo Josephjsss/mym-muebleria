@@ -100,14 +100,12 @@ con Pull Requests.
 
    | # | Script | Qué hace |
    |---|---|---|
-   | 1 | `supabase/mym_muebleria.sql` | **Base de datos completa:** tablas, ofertas, stock, pedidos y boletas, compra segura, seguridad (RLS), bucket de imágenes, los 26 productos/servicios y rol `admin` al usuario del paso 2 |
-   | 2 | `supabase/final_contacto.sql` | Mensajes de contacto y opiniones (página Contacto) |
-   | 3 | `supabase/mym_datos_demo.sql` *(opcional)* | ~80 ventas de demostración de los últimos 6 meses para los reportes |
+   | 1 | `supabase/mym_muebleria.sql` | **Base de datos completa:** tablas, ofertas, stock, pedidos y boletas, compra segura, mensajes de contacto y opiniones, seguridad (RLS), bucket de imágenes, los 26 productos/servicios y rol `admin` al usuario del paso 2 |
+   | 2 | `supabase/mym_datos_demo.sql` *(opcional)* | ~80 ventas de demostración de los últimos 6 meses para los reportes |
 
    - `mym_muebleria.sql` **borra y recrea las tablas desde cero** (productos y
      pedidos vuelven a los datos iniciales). Las cuentas de Supabase Auth no se
      borran: se vuelven a registrar en `usuarios` y el admin recupera su rol.
-     Después de ejecutarlo, ejecutar otra vez `final_contacto.sql`.
    - Las ventas de demostración quedan marcadas con `es_demo` y se borran con
      `delete from pedidos where es_demo;`.
 
@@ -208,6 +206,5 @@ public/
   images/equipo/             Fotos del equipo
 supabase/
   mym_muebleria.sql      Base de datos completa (un solo script)
-  final_contacto.sql     Mensajes de contacto y opiniones de clientes
   mym_datos_demo.sql     (Opcional) ventas de demostración para los reportes
 ```
