@@ -18,24 +18,23 @@ export default async function ProductoDetallePage(props: PageProps<"/productos/[
   const idNumero = Number(id);
   if (!Number.isInteger(idNumero)) notFound();
 
+  // Producto y catálogo activo EN PARALELO (una sola espera a la BD); los
+  // relacionados se filtran aquí porque el catálogo es pequeño.
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("productos")
-    .select(PRODUCTO_SELECT)
-    .eq("id", idNumero)
-    .eq("activo", true)
-    .maybeSingle();
-  if (!data) notFound();
-  const producto = data as Producto;
-
-  const { data: relacionados } = await supabase
-    .from("productos")
-    .select(PRODUCTO_SELECT)
-    .eq("categoria_id", producto.categoria_id)
-    .neq("id", producto.id)
-    .eq("activo", true)
-    .order("codigo")
-    .limit(4);
+  const [productoRes, catalogoRes] = await Promise.all([
+    supabase.from("productos").select(PRODUCTO_SELECT).eq("id", idNumero).eq("activo", true).maybeSingle(),
+    supabase
+      .from("productos")
+      .select(PRODUCTO_SELECT)
+      .eq("activo", true)
+      .neq("id", idNumero)
+      .order("codigo"),
+  ]);
+  if (!productoRes.data) notFound();
+  const producto = productoRes.data as Producto;
+  const relacionados = ((catalogoRes.data ?? []) as Producto[])
+    .filter((p) => p.categoria_id === producto.categoria_id)
+    .slice(0, 4);
 
   const whatsapp = `https://wa.me/51${company.whatsapp[0].replace(/\D/g, "")}?text=${encodeURIComponent(
     `Hola, me interesa: ${producto.nombre} (${producto.codigo}).`
@@ -110,13 +109,13 @@ export default async function ProductoDetallePage(props: PageProps<"/productos/[
             </div>
           </div>
 
-          {relacionados && relacionados.length > 0 && (
+          {relacionados.length > 0 && (
             <section className="mt-16">
               <h2 className="font-heading text-xl font-semibold">
                 Más en {producto.categoria?.nombre}
               </h2>
               <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                {(relacionados as Producto[]).map((p) => (
+                {relacionados.map((p) => (
                   <ProductCard key={p.id} producto={p} />
                 ))}
               </div>
