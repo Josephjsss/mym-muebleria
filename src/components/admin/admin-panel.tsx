@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cambiarEstadoProducto, eliminarProducto } from "@/app/admin/actions";
 import { ProductoFormDialog } from "@/components/admin/producto-form";
-import { AdminHeader } from "@/components/admin/admin-header";
 import { ProductImage } from "@/components/site/product-image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +25,6 @@ import {
   type CampoBusqueda,
   type Categoria,
   type Producto,
-  type Usuario,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
@@ -49,7 +47,6 @@ import {
 } from "lucide-react";
 
 type Props = {
-  usuario: Usuario;
   productos: Producto[];
   categorias: Categoria[];
   resumen: { total: number; productos: number; servicios: number; desactivados: number };
@@ -59,7 +56,6 @@ type Props = {
 };
 
 export function AdminPanel({
-  usuario,
   productos,
   categorias,
   resumen,
@@ -154,9 +150,7 @@ export function AdminPanel({
   }
 
   return (
-    <div className="min-h-full flex-1 bg-muted/40">
-      <AdminHeader usuario={usuario} activa="/admin" />
-
+    <>
       <main className="mx-auto max-w-7xl px-4 py-6">
         {/* Resumen */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -487,7 +481,7 @@ export function AdminPanel({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 
