@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import type { Usuario } from "@/lib/types";
@@ -15,14 +15,11 @@ const secciones = [
 ] as const;
 
 /** Barra superior del sistema interno (administrador). */
-export function AdminHeader({
-  usuario,
-  activa,
-}: {
-  usuario: Pick<Usuario, "nombre" | "correo" | "rol">;
-  activa: "/admin" | "/admin/reportes";
-}) {
+export function AdminHeader({ usuario }: { usuario: Pick<Usuario, "nombre" | "correo" | "rol"> }) {
   const router = useRouter();
+  // La cabecera vive en el layout (no se vuelve a dibujar al navegar):
+  // la pestaña activa se lee de la URL actual.
+  const activa = usePathname() === "/admin/reportes" ? "/admin/reportes" : "/admin";
 
   async function cerrarSesion() {
     await createClient().auth.signOut();
