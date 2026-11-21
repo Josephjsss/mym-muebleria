@@ -91,7 +91,7 @@ export default async function ProductosPage(props: PageProps<"/productos">) {
                 <p className="font-medium">No se pudo conectar con la base de datos.</p>
                 <p className="mt-1 text-muted-foreground">
                   Revisa el archivo <code>.env.local</code> y que el script{" "}
-                  <code>supabase/mym_avance2.sql</code> se haya ejecutado. Detalle: {error.message}
+                  <code>supabase/mym_muebleria.sql</code> se haya ejecutado. Detalle: {error.message}
                 </p>
               </div>
             </div>

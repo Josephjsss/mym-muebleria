@@ -111,7 +111,7 @@ export function ReportesPanel({
           <AlertCircle className="size-4 shrink-0" />
           {errorBD
             ? /does not exist|could not find/i.test(errorBD)
-              ? "Falta preparar la base de datos: ejecuta supabase/final_ofertas_compras.sql en Supabase."
+              ? "Falta preparar la base de datos: ejecuta supabase/mym_muebleria.sql en Supabase."
               : `Error de base de datos: ${errorBD}`
             : errorExportar}
         </p>

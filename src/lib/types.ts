@@ -1,4 +1,4 @@
-// Tipos que reflejan las tablas de la base de datos (supabase/mym_avance2.sql).
+// Tipos que reflejan las tablas de la base de datos (supabase/mym_muebleria.sql).
 
 export type Categoria = {
   id: number;

@@ -175,7 +175,7 @@ function traducirError(mensaje: string) {
   if (/duplicate key.*codigo/i.test(mensaje)) return "Ya existe un producto con ese código.";
   if (/productos_descuento_chk/i.test(mensaje)) return `La oferta debe ser de ${DESCUENTO_MINIMO} % como mínimo.`;
   if (/column .*(descuento|stock).* does not exist|could not find the '(descuento|stock)' column/i.test(mensaje))
-    return "Falta preparar la base de datos: ejecuta supabase/final_ofertas_compras.sql en Supabase.";
+    return "Falta preparar la base de datos: ejecuta supabase/mym_muebleria.sql en Supabase.";
   if (/row-level security/i.test(mensaje)) return "La base de datos rechazó la operación: tu usuario no es administrador.";
   return mensaje;
 }

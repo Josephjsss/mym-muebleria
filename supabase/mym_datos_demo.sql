@@ -5,7 +5,7 @@
 --  panel tengan datos que mostrar en la presentación.
 --  - Quedan marcados con es_demo = true (no son ventas reales).
 --  - NO descuentan stock.
---  - Requiere haber ejecutado antes final_ofertas_compras.sql.
+--  - Requiere haber ejecutado antes mym_muebleria.sql.
 --
 --  Para BORRARLOS:   delete from public.pedidos where es_demo;
 -- =====================================================================
@@ -25,7 +25,7 @@ declare
 begin
   select id into v_usuario from public.usuarios where rol = 'admin' order by id limit 1;
   if v_usuario is null then
-    raise exception 'No hay un usuario admin: ejecuta primero mym_avance2.sql.';
+    raise exception 'No hay un usuario admin: ejecuta primero mym_muebleria.sql.';
   end if;
 
   delete from public.pedidos where es_demo;   -- se puede volver a ejecutar

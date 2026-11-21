@@ -1,14 +1,25 @@
 -- =====================================================================
---  M&M Mueblería y Taller en Melamine — Base de datos (Avance 2)
+--  M&M Mueblería y Taller en Melamine — BASE DE DATOS COMPLETA (entrega final)
 --  Motor: PostgreSQL (Supabase)
 --
 --  Cómo usarlo:
---    Supabase > SQL Editor > New query > pegar TODO este archivo > Run.
---    Se puede volver a ejecutar: borra y recrea las tablas desde cero.
+--    1. Supabase > Authentication > Users > "Add user" > "Create new user"
+--       correo: admin@mymmuebleria.pe · contraseña: la que elijan
+--       (marcar "Auto Confirm User").
+--    2. Supabase > SQL Editor > New query > pegar TODO este archivo > Run.
+--
+--  ¡OJO! Borra y recrea las tablas desde cero (productos, pedidos, etc.).
+--  Las cuentas de Supabase Auth NO se borran: al final se vuelven a
+--  registrar en la tabla usuarios y el admin recupera su rol.
 --
 --  Entidades:
 --    usuarios   (1) ──registra──< (N) productos
 --    categorias (1) ──agrupa────< (N) productos
+--    usuarios   (1) ──compra────< (N) pedidos (1) ──< (N) pedido_items
+--
+--  Incluye: catálogo con eliminación lógica (activo), ofertas (descuento
+--  mínimo 5 %), stock, carrito → pedidos con boleta, compra segura
+--  (registrar_compra) y seguridad por filas (RLS).
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -17,9 +28,15 @@
 drop trigger if exists al_registrarse_usuario on auth.users;
 drop function if exists public.crear_usuario_al_registrarse() cascade;
 drop function if exists public.es_admin() cascade;
+drop function if exists public.registrar_compra(jsonb, text, text, text, text, uuid) cascade;
+drop function if exists public.registrar_compra(jsonb, text, text, text, text) cascade;
+drop function if exists public.mi_usuario_id() cascade;
+drop table if exists public.pedido_items cascade;
+drop table if exists public.pedidos      cascade;
 drop table if exists public.productos  cascade;
 drop table if exists public.categorias cascade;
 drop table if exists public.usuarios   cascade;
+drop sequence if exists public.boleta_numero_seq;
 
 -- ---------------------------------------------------------------------
 -- 1. Tablas
@@ -63,12 +80,17 @@ create table public.productos (
   categoria_id    integer       not null references public.categorias (id),
   registrado_por  integer       references public.usuarios (id) on delete set null,
   activo          boolean       not null default true,           -- false = desactivado (se puede reactivar)
+  descuento       smallint      not null default 0               -- % de oferta: 0 = sin oferta
+                  constraint productos_descuento_chk check (descuento = 0 or descuento between 5 and 90),
+  stock           integer       not null default 0               -- unidades a la venta
+                  constraint productos_stock_chk check (stock >= 0),
   creado_en       timestamptz   not null default now(),
   actualizado_en  timestamptz   not null default now()
 );
 
 create index productos_categoria_idx on public.productos (categoria_id);
 create index productos_nombre_idx    on public.productos (lower(nombre));
+create index productos_activo_idx    on public.productos (activo);
 
 -- Mantiene actualizado_en al editar.
 create or replace function public.tocar_actualizado_en()
@@ -81,6 +103,51 @@ end $$;
 create trigger productos_actualizado_en
 before update on public.productos
 for each row execute function public.tocar_actualizado_en();
+
+-- ---------------------------------------------------------------------
+-- 1.4 PEDIDOS (cada uno es una boleta B001-000001) y su detalle
+-- ---------------------------------------------------------------------
+create sequence public.boleta_numero_seq start 1;
+
+create table public.pedidos (
+  id                integer generated always as identity primary key,
+  serie             varchar(4)    not null default 'B001',
+  numero            integer       not null default nextval('public.boleta_numero_seq'),
+  usuario_id        integer       not null references public.usuarios (id),
+  cliente_nombre    varchar(120)  not null,
+  cliente_dni       varchar(8)    not null check (cliente_dni ~ '^[0-9]{8}$'),
+  cliente_telefono  varchar(20),
+  direccion         varchar(200),
+  subtotal          numeric(10,2) not null default 0,   -- a precio de lista
+  descuento         numeric(10,2) not null default 0,   -- ahorro por ofertas
+  total             numeric(10,2) not null default 0,   -- lo que paga (IGV incluido)
+  estado            varchar(15)   not null default 'Pagado'
+                    check (estado in ('Pagado', 'Entregado', 'Anulado')),
+  es_demo           boolean       not null default false, -- true = dato de demostración
+  clave             uuid          unique,                -- evita pedidos duplicados (doble clic)
+  creado_en         timestamptz   not null default now(),
+  unique (serie, numero)
+);
+
+-- El detalle guarda una COPIA del nombre, categoría y precios del momento de la
+-- compra: si luego cambia el precio o se borra el producto, la boleta no cambia.
+create table public.pedido_items (
+  id               integer generated always as identity primary key,
+  pedido_id        integer       not null references public.pedidos (id) on delete cascade,
+  producto_id      integer       references public.productos (id) on delete set null,
+  codigo           varchar(10)   not null,
+  nombre           varchar(120)  not null,
+  categoria        varchar(60)   not null,
+  cantidad         integer       not null check (cantidad > 0),
+  precio_unitario  numeric(10,2) not null,   -- precio de lista
+  descuento_pct    smallint      not null default 0,
+  precio_final     numeric(10,2) not null,   -- con la oferta aplicada
+  importe          numeric(10,2) not null    -- precio_final * cantidad
+);
+
+create index pedidos_usuario_idx  on public.pedidos (usuario_id);
+create index pedidos_fecha_idx    on public.pedidos (creado_en);
+create index pedido_items_ped_idx on public.pedido_items (pedido_id);
 
 -- ---------------------------------------------------------------------
 -- 2. Registro automático: cada cuenta nueva de Supabase Auth
@@ -118,11 +185,141 @@ as $$
   );
 $$;
 
+-- id (tabla usuarios) del usuario que hace la consulta.
+create or replace function public.mi_usuario_id()
+returns integer
+language sql stable
+security definer set search_path = public
+as $$
+  select id from public.usuarios where auth_id = auth.uid();
+$$;
+
 -- ---------------------------------------------------------------------
--- 3. Seguridad (Row Level Security)
+-- 3. COMPRA SEGURA
+--    Todo ocurre en UNA transacción. "for update" bloquea la fila de cada
+--    producto: si dos clientes compran la última unidad al mismo tiempo, el
+--    segundo espera al primero y luego ve stock 0, así nunca se vende de más.
+--    Los precios se leen de la BD (no se confía en los que manda el navegador).
+--    p_clave: identificador único de ESTE intento de compra. Si llega dos veces
+--    (doble clic, reintento de red) se devuelve el mismo pedido, no uno nuevo.
+--
+--    p_items: [{"producto_id": 3, "cantidad": 2}, ...]
+-- ---------------------------------------------------------------------
+create or replace function public.registrar_compra(
+  p_items     jsonb,
+  p_nombre    text,
+  p_dni       text,
+  p_telefono  text default null,
+  p_direccion text default null,
+  p_clave     uuid default null
+)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_usuario   integer := public.mi_usuario_id();
+  v_pedido    integer;
+  v_item      record;
+  v_prod      record;
+  v_final     numeric(10,2);
+  v_subtotal  numeric(10,2) := 0;
+  v_total     numeric(10,2) := 0;
+begin
+  if v_usuario is null then
+    raise exception 'Debes iniciar sesión para comprar.';
+  end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'El carrito está vacío.';
+  end if;
+  if coalesce(trim(p_nombre), '') = '' then
+    raise exception 'Escribe tu nombre completo.';
+  end if;
+  if p_dni !~ '^[0-9]{8}$' then
+    raise exception 'El DNI debe tener 8 dígitos.';
+  end if;
+
+  -- ¿Esta misma compra ya se registró? (doble clic / reintento)
+  if p_clave is not null then
+    select id into v_pedido from public.pedidos where clave = p_clave and usuario_id = v_usuario;
+    if found then
+      return v_pedido;
+    end if;
+  end if;
+
+  insert into public.pedidos (usuario_id, cliente_nombre, cliente_dni, cliente_telefono, direccion, clave)
+  values (v_usuario, trim(p_nombre), p_dni, nullif(trim(p_telefono), ''), nullif(trim(p_direccion), ''), p_clave)
+  on conflict (clave) do nothing
+  returning id into v_pedido;
+
+  -- Otro intento con la misma clave terminó justo antes: devolver ese pedido.
+  if v_pedido is null then
+    select id into v_pedido from public.pedidos where clave = p_clave and usuario_id = v_usuario;
+    if v_pedido is null then
+      raise exception 'No se pudo registrar el pedido. Inténtalo de nuevo.';
+    end if;
+    return v_pedido;
+  end if;
+
+  -- Se agrupan productos repetidos y se recorren en orden de id
+  -- (mismo orden de bloqueo para todos = sin interbloqueos).
+  for v_item in
+    select (e ->> 'producto_id')::int as producto_id, sum((e ->> 'cantidad')::int)::int as cantidad
+    from jsonb_array_elements(p_items) e
+    group by 1
+    order by 1
+  loop
+    if v_item.cantidad is null or v_item.cantidad < 1 or v_item.cantidad > 99 then
+      raise exception 'Cantidad no válida.';
+    end if;
+
+    select p.id, p.codigo, p.nombre, p.tipo, p.precio, p.descuento, p.stock, p.activo,
+           c.nombre as categoria
+      into v_prod
+      from public.productos p
+      join public.categorias c on c.id = p.categoria_id
+     where p.id = v_item.producto_id
+       for update of p;
+
+    if not found or not v_prod.activo then
+      raise exception 'Un producto del carrito ya no está disponible.';
+    end if;
+    if v_prod.tipo <> 'Producto' or v_prod.precio <= 0 then
+      raise exception '«%» no se vende en línea; consúltalo por WhatsApp.', v_prod.nombre;
+    end if;
+    if v_prod.stock < v_item.cantidad then
+      raise exception 'Stock insuficiente de «%»: quedan % unidad(es).', v_prod.nombre, v_prod.stock;
+    end if;
+
+    v_final := round(v_prod.precio * (100 - v_prod.descuento) / 100.0, 2);
+
+    insert into public.pedido_items
+      (pedido_id, producto_id, codigo, nombre, categoria, cantidad,
+       precio_unitario, descuento_pct, precio_final, importe)
+    values
+      (v_pedido, v_prod.id, v_prod.codigo, v_prod.nombre, v_prod.categoria, v_item.cantidad,
+       v_prod.precio, v_prod.descuento, v_final, v_final * v_item.cantidad);
+
+    update public.productos set stock = stock - v_item.cantidad where id = v_prod.id;
+
+    v_subtotal := v_subtotal + v_prod.precio * v_item.cantidad;
+    v_total    := v_total + v_final * v_item.cantidad;
+  end loop;
+
+  update public.pedidos
+     set subtotal = v_subtotal, descuento = v_subtotal - v_total, total = v_total
+   where id = v_pedido;
+
+  return v_pedido;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 4. Seguridad (Row Level Security)
 --    - Cualquiera puede VER los productos ACTIVOS y las categorías (el admin ve todos).
 --    - Solo el ADMIN puede crear, editar o eliminar.
 --    - Cada usuario ve su propio perfil; el admin ve todos.
+--    - Cada cliente ve solo SUS pedidos; el admin ve todos y cambia su estado.
+--    - Nadie inserta pedidos directamente: solo con registrar_compra().
 -- ---------------------------------------------------------------------
 alter table public.usuarios   enable row level security;
 alter table public.categorias enable row level security;
@@ -150,8 +347,28 @@ grant select on public.productos, public.categorias to anon, authenticated;
 grant insert, update, delete on public.productos, public.categorias to authenticated;
 grant select on public.usuarios to authenticated;
 
+-- Pedidos y boletas
+alter table public.pedidos      enable row level security;
+alter table public.pedido_items enable row level security;
+
+create policy "pedidos: ver los mios"
+  on public.pedidos for select using (usuario_id = public.mi_usuario_id() or public.es_admin());
+create policy "pedidos: admin edita"
+  on public.pedidos for update using (public.es_admin()) with check (public.es_admin());
+create policy "detalle: ver los mios"
+  on public.pedido_items for select using (
+    exists (select 1 from public.pedidos p
+            where p.id = pedido_id and (p.usuario_id = public.mi_usuario_id() or public.es_admin()))
+  );
+
+grant select on public.pedidos, public.pedido_items to authenticated;
+grant update on public.pedidos to authenticated;
+
+revoke all on function public.registrar_compra(jsonb, text, text, text, text, uuid) from public, anon;
+grant execute on function public.registrar_compra(jsonb, text, text, text, text, uuid) to authenticated;
+
 -- ---------------------------------------------------------------------
--- 4. Almacenamiento de imágenes (Supabase Storage)
+-- 5. Almacenamiento de imágenes (Supabase Storage)
 --    Bucket público "productos": todos ven las fotos, solo el admin sube.
 -- ---------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
@@ -173,7 +390,7 @@ create policy "imagenes productos: eliminar"
   on storage.objects for delete using (bucket_id = 'productos' and public.es_admin());
 
 -- ---------------------------------------------------------------------
--- 5. Datos iniciales
+-- 6. Datos iniciales
 -- ---------------------------------------------------------------------
 insert into public.categorias (codigo, nombre, descripcion) values
   ('CAT-01', 'Roperos',     'Roperos de línea y a medida en melamina'),
@@ -283,18 +500,34 @@ from (values
 join public.categorias c on c.nombre = p.categoria
 order by p.codigo;
 
+-- Stock inicial: 10 unidades por producto (los servicios no llevan stock).
+update public.productos set stock = 10 where tipo = 'Producto';
+
+-- Ofertas iniciales (el admin las cambia desde el panel). Mínimo 5 %.
+update public.productos set descuento = 15 where codigo = 'PRD-001';
+update public.productos set descuento = 10 where codigo = 'PRD-004';
+update public.productos set descuento = 20 where codigo = 'PRD-007';
+update public.productos set descuento = 5  where codigo = 'PRD-010';
+update public.productos set descuento = 12 where codigo = 'PRD-013';
+
 -- ---------------------------------------------------------------------
--- 6. Administrador
---    a) Supabase > Authentication > Users > "Add user" > "Create new user"
---       correo: admin@mymmuebleria.pe  ·  contraseña: la que elijan
---       (marcar "Auto Confirm User").
---    b) Ejecutar la línea de abajo (si el usuario ya existía antes del
---       script, el insert lo registra en public.usuarios):
+-- 7. Usuarios y administrador
+--    a) Las cuentas que ya existían en Supabase Auth se vuelven a registrar
+--       en public.usuarios (rol 'cliente'), así no pierden su perfil.
+--    b) La cuenta admin@mymmuebleria.pe recibe el rol 'admin'.
 -- ---------------------------------------------------------------------
+insert into public.usuarios (auth_id, nombre, correo)
+select id,
+       coalesce(nullif(raw_user_meta_data ->> 'nombre', ''), split_part(email, '@', 1)),
+       email
+from auth.users
+where email is not null
+on conflict (auth_id) do nothing;
+
 insert into public.usuarios (auth_id, nombre, correo, rol)
 select id, 'Administrador M&M', email, 'admin'
 from auth.users where email = 'admin@mymmuebleria.pe'
 on conflict (auth_id) do update set rol = 'admin', nombre = 'Administrador M&M';
 
 -- Comprobación rápida
-select codigo, nombre, tipo, precio from public.productos order by id;
+select codigo, nombre, tipo, precio, descuento, stock from public.productos order by id;

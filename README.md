@@ -96,21 +96,20 @@ con Pull Requests.
 1. Crear un proyecto en <https://supabase.com>.
 2. **Authentication → Users → Add user → Create new user**
    - correo: `admin@mymmuebleria.pe` · contraseña: la que elijan · marcar **Auto Confirm User**.
-3. En **SQL Editor → New query**, ejecutar en este orden:
+3. En **SQL Editor → New query**, ejecutar:
 
    | # | Script | Qué hace |
    |---|---|---|
-   | 1 | `supabase/mym_avance2.sql` | Tablas base, seguridad (RLS), bucket de imágenes, los 26 productos/servicios y rol `admin` al usuario del paso 2 |
-   | 2 | `supabase/avance3_activar_productos.sql` | Columna `activo` (eliminación lógica) |
-   | 3 | `supabase/final_ofertas_compras.sql` | Ofertas, stock, pedidos, boletas y la función de compra |
-   | 4 | `supabase/final_contacto.sql` | Mensajes de contacto y opiniones |
-   | 5 | `supabase/final_datos_demo.sql` *(opcional)* | ~80 ventas de demostración de los últimos 6 meses para los reportes |
+   | 1 | `supabase/mym_muebleria.sql` | **Base de datos completa:** tablas, ofertas, stock, pedidos y boletas, compra segura, seguridad (RLS), bucket de imágenes, los 26 productos/servicios y rol `admin` al usuario del paso 2 |
+   | 2 | `supabase/final_contacto.sql` | Mensajes de contacto y opiniones (página Contacto) |
+   | 3 | `supabase/mym_datos_demo.sql` *(opcional)* | ~80 ventas de demostración de los últimos 6 meses para los reportes |
 
-   - Los scripts 2 a 5 se pueden ejecutar varias veces sin perder datos.
+   - `mym_muebleria.sql` **borra y recrea las tablas desde cero** (productos y
+     pedidos vuelven a los datos iniciales). Las cuentas de Supabase Auth no se
+     borran: se vuelven a registrar en `usuarios` y el admin recupera su rol.
+     Después de ejecutarlo, ejecutar otra vez `final_contacto.sql`.
    - Las ventas de demostración quedan marcadas con `es_demo` y se borran con
      `delete from pedidos where es_demo;`.
-   - Si se vuelve a ejecutar `mym_avance2.sql` (recrea todo desde cero), hay que
-     ejecutar de nuevo los scripts 2 a 4.
 
 ### 2. Conectar la web
 ```bash
@@ -208,9 +207,7 @@ public/
   cv/                        C.V. completos en PDF
   images/equipo/             Fotos del equipo
 supabase/
-  mym_avance2.sql                 Script base de la base de datos
-  avance3_activar_productos.sql   Columna activo (eliminación lógica)
-  final_ofertas_compras.sql       Ofertas, stock, pedidos, boletas y compra segura
-  final_contacto.sql              Mensajes de contacto y opiniones de clientes
-  final_datos_demo.sql            (Opcional) ventas de demostración para los reportes
+  mym_muebleria.sql      Base de datos completa (un solo script)
+  final_contacto.sql     Mensajes de contacto y opiniones de clientes
+  mym_datos_demo.sql     (Opcional) ventas de demostración para los reportes
 ```

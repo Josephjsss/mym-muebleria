@@ -50,7 +50,7 @@ export async function comprar(datos: DatosCompra): Promise<ResultadoCompra> {
     if (/could not find the function|does not exist/i.test(error.message)) {
       return {
         ok: false,
-        mensaje: "Falta preparar la base de datos: ejecuta supabase/final_ofertas_compras.sql en Supabase.",
+        mensaje: "Falta preparar la base de datos: ejecuta supabase/mym_muebleria.sql en Supabase.",
       };
     }
     return { ok: false, mensaje: error.message };
