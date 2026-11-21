@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -36,6 +36,8 @@ export function CarritoVista({ usuario }: { usuario: { nombre: string; rol: stri
   const [consulta, setConsulta] = useState<{ clave: string; mapa: Map<number, ProductoCarrito> } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pagando, iniciarPago] = useTransition();
+  // Un id por intento de compra: si el pedido llega dos veces, la BD devuelve el mismo.
+  const claveCompra = useRef<string | null>(null);
 
   // Ids del carrito como texto: solo se vuelve a consultar si cambian los productos.
   const claveIds = items.map((i) => i.producto_id).sort((a, b) => a - b).join(",");
@@ -77,6 +79,8 @@ export function CarritoVista({ usuario }: { usuario: { nombre: string; rol: stri
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     setError(null);
+    claveCompra.current ??= nuevaClave();
+    const clave = claveCompra.current;
     iniciarPago(async () => {
       const r = await comprar({
         items: vendibles.map((l) => ({ producto_id: l.item.producto_id, cantidad: l.item.cantidad })),
@@ -84,6 +88,7 @@ export function CarritoVista({ usuario }: { usuario: { nombre: string; rol: stri
         dni: String(form.get("dni") ?? ""),
         telefono: String(form.get("telefono") ?? ""),
         direccion: String(form.get("direccion") ?? ""),
+        clave,
       });
       if (!r.ok) {
         setError(r.mensaje);
@@ -289,6 +294,14 @@ export function CarritoVista({ usuario }: { usuario: { nombre: string; rol: stri
         )}
       </aside>
     </div>
+  );
+}
+
+function nuevaClave() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  // Respaldo (navegadores sin randomUUID): UUID v4 con getRandomValues.
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+    (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16)
   );
 }
 

@@ -64,6 +64,7 @@ create table if not exists public.pedidos (
   estado            varchar(15)   not null default 'Pagado'
                     check (estado in ('Pagado', 'Entregado', 'Anulado')),
   es_demo           boolean       not null default false, -- true = dato de demostración
+  clave             uuid          unique,                -- evita pedidos duplicados (doble clic)
   creado_en         timestamptz   not null default now(),
   unique (serie, numero)
 );
@@ -84,6 +85,9 @@ create table if not exists public.pedido_items (
   importe          numeric(10,2) not null    -- precio_final * cantidad
 );
 
+-- Por si la tabla se creó con una versión anterior de este script.
+alter table public.pedidos add column if not exists clave uuid unique;
+
 create index if not exists pedidos_usuario_idx  on public.pedidos (usuario_id);
 create index if not exists pedidos_fecha_idx    on public.pedidos (creado_en);
 create index if not exists pedido_items_ped_idx on public.pedido_items (pedido_id);
@@ -103,15 +107,20 @@ $$;
 --    producto: si dos clientes compran la última unidad al mismo tiempo, el
 --    segundo espera al primero y luego ve stock 0, así nunca se vende de más.
 --    Los precios se leen de la BD (no se confía en los que manda el navegador).
+--    p_clave: identificador único de ESTE intento de compra. Si llega dos veces
+--    (doble clic, reintento de red) se devuelve el mismo pedido, no uno nuevo.
 --
 --    p_items: [{"producto_id": 3, "cantidad": 2}, ...]
 -- ---------------------------------------------------------------------
+drop function if exists public.registrar_compra(jsonb, text, text, text, text);
+
 create or replace function public.registrar_compra(
   p_items     jsonb,
   p_nombre    text,
   p_dni       text,
   p_telefono  text default null,
-  p_direccion text default null
+  p_direccion text default null,
+  p_clave     uuid default null
 )
 returns integer
 language plpgsql
@@ -139,9 +148,27 @@ begin
     raise exception 'El DNI debe tener 8 dígitos.';
   end if;
 
-  insert into public.pedidos (usuario_id, cliente_nombre, cliente_dni, cliente_telefono, direccion)
-  values (v_usuario, trim(p_nombre), p_dni, nullif(trim(p_telefono), ''), nullif(trim(p_direccion), ''))
+  -- ¿Esta misma compra ya se registró? (doble clic / reintento)
+  if p_clave is not null then
+    select id into v_pedido from public.pedidos where clave = p_clave and usuario_id = v_usuario;
+    if found then
+      return v_pedido;
+    end if;
+  end if;
+
+  insert into public.pedidos (usuario_id, cliente_nombre, cliente_dni, cliente_telefono, direccion, clave)
+  values (v_usuario, trim(p_nombre), p_dni, nullif(trim(p_telefono), ''), nullif(trim(p_direccion), ''), p_clave)
+  on conflict (clave) do nothing
   returning id into v_pedido;
+
+  -- Otro intento con la misma clave terminó justo antes: devolver ese pedido.
+  if v_pedido is null then
+    select id into v_pedido from public.pedidos where clave = p_clave and usuario_id = v_usuario;
+    if v_pedido is null then
+      raise exception 'No se pudo registrar el pedido. Inténtalo de nuevo.';
+    end if;
+    return v_pedido;
+  end if;
 
   -- Se agrupan productos repetidos y se recorren en orden de id
   -- (mismo orden de bloqueo para todos = sin interbloqueos).
@@ -221,8 +248,8 @@ create policy "detalle: ver los mios"
 grant select on public.pedidos, public.pedido_items to authenticated;
 grant update on public.pedidos to authenticated;
 
-revoke all on function public.registrar_compra(jsonb, text, text, text, text) from public, anon;
-grant execute on function public.registrar_compra(jsonb, text, text, text, text) to authenticated;
+revoke all on function public.registrar_compra(jsonb, text, text, text, text, uuid) from public, anon;
+grant execute on function public.registrar_compra(jsonb, text, text, text, text, uuid) to authenticated;
 
 -- Comprobación rápida
 select codigo, nombre, precio, descuento, stock

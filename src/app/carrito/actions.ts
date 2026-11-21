@@ -12,6 +12,7 @@ type DatosCompra = {
   dni: string;
   telefono: string;
   direccion: string;
+  clave: string; // id único de este intento de compra (evita duplicados)
 };
 
 /**
@@ -33,6 +34,8 @@ export async function comprar(datos: DatosCompra): Promise<ResultadoCompra> {
   if (nombre.length < 3) return { ok: false, mensaje: "Escribe tu nombre completo." };
   if (!/^\d{8}$/.test(dni)) return { ok: false, mensaje: "El DNI debe tener 8 dígitos." };
 
+  const clave = /^[0-9a-f-]{36}$/i.test(String(datos.clave)) ? datos.clave : null;
+
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("registrar_compra", {
     p_items: items,
@@ -40,6 +43,7 @@ export async function comprar(datos: DatosCompra): Promise<ResultadoCompra> {
     p_dni: dni,
     p_telefono: String(datos.telefono ?? "").trim().slice(0, 20),
     p_direccion: String(datos.direccion ?? "").trim().slice(0, 200),
+    p_clave: clave,
   });
 
   if (error) {
