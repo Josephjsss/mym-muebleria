@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/site/product-image";
-import { formatoPrecio, type Producto } from "@/lib/types";
+import { Precio } from "@/components/site/precio";
+import { sePuedeComprar, type Producto } from "@/lib/types";
 import { Clock, ArrowUpRight } from "lucide-react";
 
 export function ProductCard({ producto }: { producto: Producto }) {
@@ -22,6 +23,16 @@ export function ProductCard({ producto }: { producto: Producto }) {
         >
           {producto.tipo}
         </Badge>
+        {Number(producto.descuento) > 0 && (
+          <span className="absolute bottom-3 left-3 rounded-md bg-secondary px-2 py-0.5 text-xs font-bold text-secondary-foreground shadow-sm">
+            Oferta -{producto.descuento}%
+          </span>
+        )}
+        {sePuedeComprar(producto) && producto.stock <= 0 && (
+          <span className="absolute bottom-3 right-3 rounded-md bg-foreground/85 px-2 py-0.5 text-xs font-semibold text-background">
+            Agotado
+          </span>
+        )}
         <span className="absolute right-3 top-3 rounded-md bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground backdrop-blur">
           {producto.codigo}
         </span>
@@ -38,12 +49,7 @@ export function ProductCard({ producto }: { producto: Producto }) {
         </p>
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <div>
-            <p className="font-heading text-lg font-bold text-foreground">
-              {producto.tipo === "Servicio" && Number(producto.precio) > 0 && (
-                <span className="mr-1 text-xs font-medium text-muted-foreground">desde</span>
-              )}
-              {formatoPrecio(producto.precio)}
-            </p>
+            <Precio producto={producto} />
             {producto.duracion && (
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="size-3" />

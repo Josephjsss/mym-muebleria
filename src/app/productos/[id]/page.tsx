@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { company } from "@/data/company";
-import { PRODUCTO_SELECT, formatoPrecio, type Producto } from "@/lib/types";
+import { Precio } from "@/components/site/precio";
+import { AgregarCarrito } from "@/components/site/agregar-carrito";
+import { PRODUCTO_SELECT, sePuedeComprar, type Producto } from "@/lib/types";
 import { ArrowLeft, Clock, MessageCircle, Tag, Layers, Hash } from "lucide-react";
 
 export default async function ProductoDetallePage(props: PageProps<"/productos/[id]">) {
@@ -72,12 +74,9 @@ export default async function ProductoDetallePage(props: PageProps<"/productos/[
               <h1 className="mt-3 font-heading text-3xl font-bold tracking-tight">
                 {producto.nombre}
               </h1>
-              <p className="mt-3 font-heading text-3xl font-bold text-primary">
-                {producto.tipo === "Servicio" && Number(producto.precio) > 0 && (
-                  <span className="mr-1.5 text-base font-medium text-muted-foreground">desde</span>
-                )}
-                {formatoPrecio(producto.precio)}
-              </p>
+              <div className="mt-3">
+                <Precio producto={producto} tamano="lg" />
+              </div>
               <p className="mt-4 leading-relaxed text-muted-foreground">{producto.descripcion}</p>
 
               <dl className="mt-6 grid grid-cols-2 gap-3 text-sm">
@@ -87,9 +86,16 @@ export default async function ProductoDetallePage(props: PageProps<"/productos/[
                 <Dato icono={Hash} etiqueta="Código" valor={producto.codigo} />
               </dl>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              {sePuedeComprar(producto) && (
+                <div className="mt-8">
+                  <AgregarCarrito producto={producto} />
+                </div>
+              )}
+
+              <div className={sePuedeComprar(producto) ? "mt-4 flex flex-wrap gap-3" : "mt-8 flex flex-wrap gap-3"}>
                 <Button
                   size="lg"
+                  variant={sePuedeComprar(producto) ? "outline" : "default"}
                   nativeButton={false}
                   className="shadow-md shadow-primary/20"
                   render={<a href={whatsapp} target="_blank" rel="noopener noreferrer" />}
