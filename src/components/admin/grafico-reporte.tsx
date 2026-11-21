@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import {
   Bar,
   BarChart,
@@ -34,9 +35,25 @@ function recortar(texto: string, max = 24) {
   return texto.length > max ? texto.slice(0, max - 1) + "…" : texto;
 }
 
+// ¿Pantalla de celular? (se actualiza al girar o cambiar el tamaño de la ventana)
+const CONSULTA_MOVIL = "(max-width: 640px)";
+function suscribirMovil(avisar: () => void) {
+  const mq = window.matchMedia(CONSULTA_MOVIL);
+  mq.addEventListener("change", avisar);
+  return () => mq.removeEventListener("change", avisar);
+}
+function useEsMovil() {
+  return useSyncExternalStore(
+    suscribirMovil,
+    () => window.matchMedia(CONSULTA_MOVIL).matches,
+    () => false
+  );
+}
+
 /** Gráfico de una sola serie: columnas (meses, días) o barras horizontales (rankings). */
 export function GraficoReporte({ reporte }: { reporte: Reporte }) {
   const horizontal = reporte.forma === "barras";
+  const movil = useEsMovil();
   const alto = horizontal ? Math.max(180, reporte.datos.length * 40 + 30) : 260;
 
   if (reporte.datos.length === 0 || reporte.datos.every((d) => d.valor === 0)) {
@@ -55,7 +72,11 @@ export function GraficoReporte({ reporte }: { reporte: Reporte }) {
       <BarChart
         data={reporte.datos}
         layout={horizontal ? "vertical" : "horizontal"}
-        margin={horizontal ? { top: 4, right: 72, bottom: 4, left: 4 } : { top: 12, right: 8, bottom: 4, left: 4 }}
+        margin={
+          horizontal
+            ? { top: 4, right: movil ? 64 : 72, bottom: 4, left: 0 }
+            : { top: 12, right: 8, bottom: 4, left: movil ? 0 : 4 }
+        }
         barCategoryGap={horizontal ? 10 : "22%"}
         accessibilityLayer
       >
@@ -66,11 +87,11 @@ export function GraficoReporte({ reporte }: { reporte: Reporte }) {
             <YAxis
               type="category"
               dataKey="etiqueta"
-              width={170}
+              width={movil ? 104 : 170}
               tickLine={false}
               axisLine={false}
               tick={{ fill: COLOR_TEXTO, fontSize: 12 }}
-              tickFormatter={(t: string) => recortar(t)}
+              tickFormatter={(t: string) => recortar(t, movil ? 14 : 24)}
             />
           </>
         ) : (
@@ -79,14 +100,14 @@ export function GraficoReporte({ reporte }: { reporte: Reporte }) {
               dataKey="etiqueta"
               tickLine={false}
               axisLine={{ stroke: COLOR_REJILLA }}
-              tick={{ fill: COLOR_TEXTO, fontSize: 12 }}
+              tick={{ fill: COLOR_TEXTO, fontSize: movil ? 11 : 12 }}
               interval={0}
-              tickFormatter={(t: string) => (reporte.datos.length > 7 ? t.slice(0, 3) : t)}
+              tickFormatter={(t: string) => (reporte.datos.length > 7 || (movil && t.length > 6) ? t.slice(0, 3) : t)}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
-              width={reporte.unidad === "soles" ? 72 : 36}
+              width={reporte.unidad === "soles" ? (movil ? 58 : 72) : 32}
               allowDecimals={false}
               tick={{ fill: COLOR_TEXTO, fontSize: 12 }}
               tickFormatter={(v: number) => abreviar(v, reporte.unidad)}
@@ -114,7 +135,7 @@ export function GraficoReporte({ reporte }: { reporte: Reporte }) {
               dataKey="valor"
               position="right"
               fill={COLOR_TEXTO}
-              fontSize={12}
+              fontSize={movil ? 11 : 12}
               formatter={(v) => formatoValor(Number(v), reporte.unidad)}
             />
           )}
