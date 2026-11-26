@@ -9,19 +9,19 @@ export const UBICACION_MAPA = "Quilmaná, Cañete, Lima, Perú";
 /** Slider de la página Contacto (4 imágenes; el requisito es de 3 a 6). */
 export const slidesContacto = [
   {
-    image: "/images/cotizacion-1.jpg",
+    image: "/images/closet-1.jpg",
     etiqueta: "Cotiza gratis",
     titulo: "Cuéntanos qué mueble necesitas",
     texto: "Te respondemos con una cotización según tus medidas y el acabado que elijas.",
   },
   {
-    image: "/images/armado-2.jpg",
+    image: "/images/entrevista-poster.jpg",
     etiqueta: "Visítanos",
     titulo: "Nuestro taller en Quilmaná",
     texto: "Mira los acabados en persona y conversa con el equipo que fabrica tu mueble.",
   },
   {
-    image: "/images/servicio-diseno.jpg",
+    image: "/images/armado-1.jpg",
     etiqueta: "Diseño a medida",
     titulo: "Tomamos medidas en tu casa",
     texto: "Diseñamos el mueble para el espacio real de tu ambiente.",
