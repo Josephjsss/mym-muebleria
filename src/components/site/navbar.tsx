@@ -59,14 +59,14 @@ export function Navbar({ active = "/" }: { active?: string }) {
       {open && (
         <div className="md:hidden border-t px-4 py-4 flex flex-col gap-4 bg-background">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               onClick={() => setOpen(false)}
               className="text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
           <AuthDialogs />
         </div>

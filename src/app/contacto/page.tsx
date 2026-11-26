@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Navbar } from "@/components/site/navbar";
 import { SiteFooter } from "@/components/site/footer";
 import { ContactoSlider } from "@/components/contacto/contacto-slider";
@@ -13,7 +15,7 @@ export const metadata: Metadata = {
   description: "Escríbenos, visítanos en Quilmaná (Cañete) y lee las opiniones de nuestros clientes.",
 };
 
-export default async function ContactoPage() {
+async function OpinionesContacto() {
   // Opiniones guardadas en la BD (solo las visibles, lo exige la RLS).
   const supabase = await createClient();
   const { data } = await supabase
@@ -42,6 +44,22 @@ export default async function ContactoPage() {
   }));
   const opiniones = deLaBD.length >= 6 ? deLaBD : [...deLaBD, ...testimonios].slice(0, 6);
 
+  return <OpinionesClientes opiniones={opiniones} />;
+}
+
+function OpinionesCargando() {
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-14" aria-busy="true" aria-label="Cargando opiniones">
+      <p role="status" className="mb-6 text-sm text-muted-foreground">Cargando opiniones…</p>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-44 rounded-xl" />)}
+      </div>
+    </section>
+  );
+}
+
+export default function ContactoPage() {
+
   return (
     <>
       <Navbar active="/contacto" />
@@ -65,7 +83,9 @@ export default async function ContactoPage() {
           <MapaSucursal />
         </section>
 
-        <OpinionesClientes opiniones={opiniones} />
+        <Suspense fallback={<OpinionesCargando />}>
+          <OpinionesContacto />
+        </Suspense>
       </main>
       <SiteFooter />
     </>

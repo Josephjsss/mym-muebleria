@@ -4,6 +4,7 @@
 // Recortado a solo la lista de píldoras (sin logo-burbuja ni menú móvil
 // propio: el sitio ya tiene los suyos en Navbar/footer).
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { gsap } from "gsap";
 import "./PillNav.css";
 
@@ -111,7 +112,7 @@ export default function PillNav({
         <ul className="pill-list" role="menubar">
           {items.map((item, i) => (
             <li key={item.href} role="none">
-              <a
+              <Link
                 role="menuitem"
                 href={item.href}
                 className={`pill${activeHref === item.href ? " is-active" : ""}`}
@@ -131,7 +132,7 @@ export default function PillNav({
                     {item.label}
                   </span>
                 </span>
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
